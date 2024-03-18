@@ -1,12 +1,13 @@
 import asyncio
 import logging
-import aiohttp
-import os
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
+from aiogram.filters import Command
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 
-from adds.handlers import router
+import adds.keyboards as kb
 
 from config import bot_token
 
@@ -15,24 +16,29 @@ bot = Bot(token=bot_token)
 dp = Dispatcher()
 
 
-async def download_file(file_id: str):
-    file_info = await bot.get_file(file_id)
-    file_url = f"https://api.telegram.org/file/bot{bot_token}/{file_info.file_path}"
+class States(StatesGroup):
+    photo = State()
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(file_url, ssl=False) as resp:
-            if resp.status == 200:
-                file_data = await resp.read()
-                filename = os.path.basename(file_info.file_path)
-                with open(filename, 'wb') as f:
-                    f.write(file_data)
-                return filename
-            else:
-                return None
+
+@dp.message(Command("start"))
+async def command_start_handler(message: Message) -> None:
+    await message.answer('Привет! Тут потом будет текст для представления, '
+                         'а пока, выбери что хочешь сделать)', reply_markup=kb.menu_keyboard)
+
+
+@dp.message(F.text == "Конвертер")
+async def converter_button(message: Message, state: FSMContext) -> None:
+    await state.set_state(States.photo)
+    await message.answer("Пришли мне фото (файлом!)")
+
+
+@dp.message(States.photo, F.document)
+async def handle_document(message: Message) -> None:
+    document = message.document
+    await bot.download(document, document.file_name)
 
 
 async def start():
-    dp.include_router(router)
     await dp.start_polling(bot)
 
 
