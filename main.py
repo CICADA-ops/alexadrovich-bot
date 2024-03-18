@@ -33,9 +33,13 @@ async def converter_button(message: Message, state: FSMContext) -> None:
 
 
 @dp.message(States.photo, F.document)
-async def handle_document(message: Message) -> None:
+async def handle_document(message: Message, state: FSMContext) -> None:
     document = message.document
-    await bot.download(document, document.file_name)
+    if document.file_name.split('.')[-1] in ['jpg', 'png', 'webp']:
+        await bot.download(document, document.file_name)
+        await state.clear()
+    else:
+        await message.answer("Пожалуста, пришлите фото")
 
 
 async def start():
