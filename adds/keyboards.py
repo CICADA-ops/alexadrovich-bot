@@ -11,10 +11,9 @@ menu_keyboard = ReplyKeyboardMarkup(keyboard=menu_buttons,
                                     resize_keyboard=True,
                                     input_field_placeholder="Выберите опцию")
 
-format_buttons = [
-    [InlineKeyboardButton(text='png', callback_data='png')],
-    [InlineKeyboardButton(text='jpg', callback_data='jpg')],
-    [InlineKeyboardButton(text='webp', callback_data='webp')],
+downloading_type_buttons = [
+    [InlineKeyboardButton(text='Видео', callback_data='video')],
+    [InlineKeyboardButton(text='Аудио', callback_data='audio')],
 ]
 
-format_keyboard = InlineKeyboardMarkup(inline_keyboard=format_buttons)
+downloading_type_keyboard = InlineKeyboardMarkup(inline_keyboard=downloading_type_buttons)

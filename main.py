@@ -1,6 +1,13 @@
 import asyncio
 import logging
 import os
+import ssl
+import re
+from time import sleep
+
+from pytube import *
+import moviepy
+from moviepy.editor import *
 
 from PIL import Image
 
@@ -16,6 +23,7 @@ import adds.keyboards as kb
 
 from config import bot_token
 
+ssl._create_default_https_context = ssl._create_unverified_context
 
 bot = Bot(token=bot_token)
 dp = Dispatcher()
@@ -24,6 +32,8 @@ dp = Dispatcher()
 class States(StatesGroup):
     photo = State()
     format = State()
+    link = State()
+    type_of_download = State()
 
 
 @dp.message(Command("start"))
@@ -130,6 +140,85 @@ async def to_webp(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
 
 
+@dp.message(F.text == "Скачать видео с Youtube")
+async def youtube_downloader(message: Message, state: FSMContext) -> None:
+    await state.set_state(States.link)
+    await message.answer("Пожалуйста, пришлите ссылку на видео")
+
+
+@dp.message(States.link)
+async def getting_link(message: Message, state: FSMContext) -> None:
+    youtube_link = message.text
+
+    if ('youtu.be' in youtube_link) or ('youtube.com' in youtube_link) or ('m.youtube.com' in youtube_link):
+        await message.answer('Теперь выберите что хотите скачать', reply_markup=kb.downloading_type_keyboard)
+        await state.update_data(link=youtube_link)
+        await state.set_state(States.type_of_download)
+    else:
+        await message.answer('Кажется, это не ссылка на ютуб')
+
+
+@dp.callback_query(States.type_of_download, F.data == 'video')
+async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    youtube_link = data['link']
+
+    youtube_object = YouTube(youtube_link)
+    youtube_object = youtube_object.streams.get_highest_resolution()
+
+    video_title = re.sub('[/:*?"<>|+.]', '', youtube_object.title) + '.mp4'
+
+    await callback.message.answer('Спасибо, пожалуйста подождите!')
+
+    try:
+        youtube_object.download()
+    except:
+        await callback.message.answer('С вашим видео что-то не так')
+        await state.clear()
+
+    while not (os.path.exists(video_title)):
+        sleep(3)
+
+    downloaded_video = FSInputFile(video_title)
+    await callback.message.answer('Ваше видео:')
+    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
+
+    os.remove(video_title)
+
+    await state.clear()
+
+
+@dp.callback_query(States.type_of_download, F.data == 'audio')
+async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    print('Аудио')
+    youtube_link = data['link']
+
+    youtube_object = YouTube(youtube_link)
+    youtube_object = youtube_object.streams.get_audio_only()
+
+    video_title = re.sub('[/:*?"<>|+.]', '', youtube_object.title).replace('\\', '') + '.mp3'
+
+    await callback.message.answer('Спасибо, пожалуйста подождите!')
+
+    try:
+        youtube_object.download(filename=video_title)
+    except:
+        await callback.message.answer('С вашим видео что-то не так')
+        await state.clear()
+
+    while not (os.path.exists(video_title)):
+        sleep(3)
+
+    downloaded_audio = FSInputFile(video_title)
+    await callback.message.answer('Ваше аудио:')
+    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_audio)
+
+    os.remove(video_title)
+
+    await state.clear()
+
+
 async def start():
     await dp.start_polling(bot)
 
@@ -140,4 +229,3 @@ if __name__ == '__main__':
         asyncio.run(start())
     except KeyboardInterrupt:
         print('error exit')
-
