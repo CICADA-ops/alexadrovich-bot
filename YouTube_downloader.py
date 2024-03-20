@@ -1,9 +1,12 @@
-
+import ssl
 
 from pytube import *
 import moviepy
 from moviepy.editor import *
 import os
+
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 def download_video(link):
     youtubeObject = YouTube(link)
@@ -25,6 +28,7 @@ def download_audio(link):
         print("Audio download is completed successfully.")
     except Exception as e:
         print(f"An error has occurred: {e}")
+
 
 link = input("Отправьте ссылку на YouTube видео: ")
 choice = input("Вы хотите скачать видео или аудио? Введите 'видео' или 'аудио': ").lower()
