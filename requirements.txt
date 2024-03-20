@@ -3,3 +3,5 @@ asyncio==3.4.3
 pillow==10.2.0
 moviepy==1.0.3
 pytube==15.0.0
+SpeechRecognition==3.10.1
+pydub==0.25.1

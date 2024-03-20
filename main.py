@@ -3,7 +3,13 @@ import logging
 import os
 import ssl
 import re
+import speech_recognition as sr
+
+from pydub import AudioSegment
+
 from time import sleep
+
+from io import BytesIO
 
 from pytube import *
 import moviepy
@@ -34,6 +40,7 @@ class States(StatesGroup):
     format = State()
     link = State()
     type_of_download = State()
+    voice_msg = State()
 
 
 @dp.message(Command("start"))
@@ -52,7 +59,7 @@ async def converter_button(message: Message, state: FSMContext) -> None:
 async def handle_document(message: Message, state: FSMContext) -> None:
     document = message.document
     photo_formats = ['jpg', 'png', 'webp']
-    file_format = document.file_name.split('.')[-1]
+    file_format = (document.file_name.split('.')[-1]).lower()
     if file_format in photo_formats:
         await bot.download(document, document.file_name)
 
@@ -98,7 +105,6 @@ async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
-    print(format_from)
     format_in = '.jpg'
     new_img = f'{path.replace(format_from, '')}1{format_in}'
 
@@ -217,6 +223,72 @@ async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
     os.remove(video_title)
 
     await state.clear()
+
+
+@dp.message(F.voice)
+async def translation_without_message(message: Message) -> None:
+
+    voice_msg_id = message.voice.file_id
+
+    file = await bot.get_file(voice_msg_id)
+    file_path = file.file_path
+
+    await bot.download_file(file_path, 'voice_message.ogg')
+
+    audio = AudioSegment.from_ogg('voice_message.ogg')
+    audio.export('voice_message.wav', format="wav")
+
+    recognizer = sr.Recognizer()
+    with sr.AudioFile('voice_message.wav') as source:
+        audio_data = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio_data, language='ru-RU')
+            await message.answer(text)
+        except sr.UnknownValueError:
+            await message.answer("Извините, не удалось распознать речь.")
+        except sr.RequestError as e:
+            await message.reply(f"Произошла ошибка в распознавании речи: {e}")
+
+    os.remove('voice_message.ogg')
+    os.remove('voice_message.wav')
+
+    await message.answer("Ваше расшифрованное сообщение выше")
+
+
+@dp.message(F.text == "Расшифровать голосовое")
+async def converter_button(message: Message, state: FSMContext) -> None:
+    await state.set_state(States.voice_msg)
+    await message.answer("Пришлите голосовое сообщение")
+
+
+@dp.message(F.voice, States.voice_msg)
+async def translation(message: Message, state: FSMContext) -> None:
+    voice_msg_id = message.voice.file_id
+
+    file = await bot.get_file(voice_msg_id)
+    file_path = file.file_path
+
+    await bot.download_file(file_path, 'voice_message.ogg')
+
+    audio = AudioSegment.from_ogg('voice_message.ogg')
+    audio.export('voice_message.wav', format="wav")
+
+    recognizer = sr.Recognizer()
+    with sr.AudioFile('voice_message.wav') as source:
+        audio_data = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio_data, language='ru-RU')
+            await message.answer(text)
+        except sr.UnknownValueError:
+            await message.answer("Извините, не удалось распознать речь.")
+        except sr.RequestError as e:
+            await message.answer(f"Произошла ошибка в распознавании речи: {e}")
+
+    os.remove('voice_message.ogg')
+    os.remove('voice_message.wav')
+
+    await state.clear()
+    await message.answer("Ваше расшифрованное сообщение выше")
 
 
 async def start():
