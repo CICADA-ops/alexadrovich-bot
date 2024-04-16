@@ -10,7 +10,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 def download_video(link):
     youtubeObject = YouTube(link)
-    #youtubeObject = youtubeObject.streams.get_highest_resolution()
+    youtubeObject = youtubeObject.streams.get_highest_resolution()
     try:
         youtubeObject.download()
     except:
