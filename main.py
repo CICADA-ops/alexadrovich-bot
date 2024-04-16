@@ -172,7 +172,7 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
     youtube_object = YouTube(youtube_link)
     youtube_object = youtube_object.streams.get_highest_resolution()
 
-    video_title = re.sub('[/:*?"<>|+.]', '', youtube_object.title) + '.mp4'
+    video_title = re.sub('[/:*?"<>|+.#]', '', youtube_object.title).replace('\\', '') + '.mp4'
 
     await callback.message.answer('Спасибо, пожалуйста подождите!')
 
@@ -203,7 +203,7 @@ async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
     youtube_object = YouTube(youtube_link)
     youtube_object = youtube_object.streams.get_audio_only()
 
-    video_title = re.sub('[/:*?"<>|+.]', '', youtube_object.title).replace('\\', '') + '.mp3'
+    video_title = re.sub('[/:*?"<>|+.#]', '', youtube_object.title).replace('\\', '') + '.mp3'
 
     await callback.message.answer('Спасибо, пожалуйста подождите!')
 
@@ -247,7 +247,7 @@ async def translation_without_message(message: Message) -> None:
         except sr.UnknownValueError:
             await message.answer("Извините, не удалось распознать речь.")
         except sr.RequestError as e:
-            await message.reply(f"Произошла ошибка в распознавании речи: {e}")
+            await message.answer(f"Произошла ошибка в распознавании речи: {e}")
 
     os.remove('voice_message.ogg')
     os.remove('voice_message.wav')
