@@ -10,7 +10,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 def download_video(link):
     youtubeObject = YouTube(link)
-    youtubeObject = youtubeObject.streams.get_highest_resolution()
+    #youtubeObject = youtubeObject.streams.get_highest_resolution()
     try:
         youtubeObject.download()
     except:
@@ -22,7 +22,7 @@ def download_audio(link):
     try:
         youtubeObject = YouTube(link)
         audio_stream = youtubeObject.streams.get_audio_only()
-        # Получаем безопасное для файла имя видео
+
         name = f"{audio_stream.title}.mp3".replace("/", "-").replace("|", "-")
         audio_stream.download(filename=name)
         print("Audio download is completed successfully.")
