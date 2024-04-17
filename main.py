@@ -484,6 +484,43 @@ async def translation(message: Message, state: FSMContext) -> None:
     await message.answer("Ваше расшифрованное сообщение выше")
 
 
+@dp.message(F.video_note)
+async def translation_video_note(message: Message) -> None:
+    note_msg_id = message.video_note.file_id
+    file = await bot.get_file(note_msg_id)
+
+    file_path = file.file_path
+
+    await bot.download_file(file_path, f'{message.from_user.id}_video_note_message.mp4')
+
+    mp4_file = f"{message.from_user.id}_video_note_message.mp4"
+    mp3_file = f"{message.from_user.id}_video_note_message.mp3"
+
+    video = moviepy.editor.VideoFileClip(mp4_file)
+    audio = video.audio
+    audio.write_audiofile(mp3_file)
+
+    audio = AudioSegment.from_mp3(f"{message.from_user.id}_video_note_message.mp3")
+    audio.export(f'{message.from_user.id}_video_note_message.wav', format="wav")
+
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(f'{message.from_user.id}_video_note_message.wav') as source:
+        audio_data = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio_data, language='ru-RU')
+            await message.answer(text)
+        except sr.UnknownValueError:
+            await message.answer("Извините, не удалось распознать речь.")
+        except sr.RequestError as e:
+            await message.answer(f"Произошла ошибка в распознавании речи: {e}")
+
+    os.remove(f'{message.from_user.id}_video_note_message.mp3')
+    os.remove(f'{message.from_user.id}_video_note_message.wav')
+    os.remove(f'{message.from_user.id}_video_note_message.mp4')
+
+    await message.answer("Ваше расшифрованное сообщение выше")
+
+
 async def start():
     await dp.start_polling(bot)
 
