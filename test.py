@@ -17,12 +17,15 @@ l = set()
 for stream in streams:
     if stream.resolution:
         l.add(stream.resolution)
-
+l = sorted(l)
+for i in l:
+    print(i)
+'''
 desired_resolution = '144p'
 filtered_streams = streams.filter(res=desired_resolution)
 stream = filtered_streams.first()
 stream.download()
-
+'''
 
 '''
 path = 'Photo.jpg'
@@ -41,4 +44,10 @@ cv = Converter('Техническое_задание1.pdf')
 cv.convert('Техническое_задание2.docx')
 cv.close()
 '''
-
+'''
+144p
+240p
+360p
+480p
+720p
+'''
