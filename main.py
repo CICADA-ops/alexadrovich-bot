@@ -261,19 +261,18 @@ async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.message(F.voice)
 async def translation_without_message(message: Message) -> None:
-
     voice_msg_id = message.voice.file_id
 
     file = await bot.get_file(voice_msg_id)
     file_path = file.file_path
 
-    await bot.download_file(file_path, 'voice_message.ogg')
+    await bot.download_file(file_path, f'{message.from_user.id}_voice_message.ogg')
 
-    audio = AudioSegment.from_ogg('voice_message.ogg')
-    audio.export('voice_message.wav', format="wav")
+    audio = AudioSegment.from_ogg(f'{message.from_user.id}_voice_message.ogg')
+    audio.export(f'{message.from_user.id}_voice_message.wav', format="wav")
 
     recognizer = sr.Recognizer()
-    with sr.AudioFile('voice_message.wav') as source:
+    with sr.AudioFile(f'{message.from_user.id}_voice_message.wav') as source:
         audio_data = recognizer.record(source)
         try:
             text = recognizer.recognize_google(audio_data, language='ru-RU')
@@ -283,8 +282,8 @@ async def translation_without_message(message: Message) -> None:
         except sr.RequestError as e:
             await message.answer(f"Произошла ошибка в распознавании речи: {e}")
 
-    os.remove('voice_message.ogg')
-    os.remove('voice_message.wav')
+    os.remove(f'{message.from_user.id}_voice_message.ogg')
+    os.remove(f'{message.from_user.id}_voice_message.wav')
 
     await message.answer("Ваше расшифрованное сообщение выше")
 
@@ -302,13 +301,13 @@ async def translation(message: Message, state: FSMContext) -> None:
     file = await bot.get_file(voice_msg_id)
     file_path = file.file_path
 
-    await bot.download_file(file_path, 'voice_message.ogg')
+    await bot.download_file(file_path, f'{message.from_user.id}_voice_message.ogg')
 
-    audio = AudioSegment.from_ogg('voice_message.ogg')
-    audio.export('voice_message.wav', format="wav")
+    audio = AudioSegment.from_ogg(f'{message.from_user.id}_voice_message.ogg')
+    audio.export(f'{message.from_user.id}_voice_message.wav', format="wav")
 
     recognizer = sr.Recognizer()
-    with sr.AudioFile('voice_message.wav') as source:
+    with sr.AudioFile(f'{message.from_user.id}_voice_message.wav') as source:
         audio_data = recognizer.record(source)
         try:
             text = recognizer.recognize_google(audio_data, language='ru-RU')
@@ -318,8 +317,8 @@ async def translation(message: Message, state: FSMContext) -> None:
         except sr.RequestError as e:
             await message.answer(f"Произошла ошибка в распознавании речи: {e}")
 
-    os.remove('voice_message.ogg')
-    os.remove('voice_message.wav')
+    os.remove(f'{message.from_user.id}_voice_message.ogg')
+    os.remove(f'{message.from_user.id}_voice_message.wav')
 
     await state.clear()
     await message.answer("Ваше расшифрованное сообщение выше")
