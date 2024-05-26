@@ -4,10 +4,15 @@ import os
 import ssl
 import re
 import speech_recognition as sr
+import requests
 
 from pydub import AudioSegment
 
 from time import sleep
+
+from docx2pdf import convert
+
+from pdf2docx import Converter
 
 from io import BytesIO
 
@@ -40,6 +45,7 @@ class States(StatesGroup):
     format = State()
     link = State()
     type_of_download = State()
+    resolution = State()
     voice_msg = State()
 
 
@@ -52,14 +58,18 @@ async def command_start_handler(message: Message) -> None:
 @dp.message(F.text == "Конвертер")
 async def converter_button(message: Message, state: FSMContext) -> None:
     await state.set_state(States.photo)
-    await message.answer("Пришли фото (файлом)")
+    await message.answer("Пришли фото или документ (файлом)")
 
 
 @dp.message(States.photo, F.document)
 async def handle_document(message: Message, state: FSMContext) -> None:
     document = message.document
+
     photo_formats = ['jpg', 'png', 'webp']
+    doc_formats = ['docx', 'pdf']
+
     file_format = (document.file_name.split('.')[-1]).lower()
+
     if file_format in photo_formats:
         await bot.download(document, document.file_name)
 
@@ -75,8 +85,36 @@ async def handle_document(message: Message, state: FSMContext) -> None:
         await message.answer("Выберите формат для нового файла:", reply_markup=format_keyboard)
         await state.update_data(photo=document.file_name)
         await state.set_state(States.format)
+
+    elif file_format in doc_formats:
+        await bot.download(document, document.file_name)
+
+        if file_format == 'docx':
+            convert(document.file_name, document.file_name.split('.')[0] + '.pdf')
+
+            converted_file = FSInputFile(document.file_name.split('.')[0] + '.pdf')
+            await message.answer('Ваш файл:')
+            await bot.send_document(chat_id=message.chat.id, document=converted_file)
+
+            os.remove(document.file_name)
+            os.remove(document.file_name.split('.')[0] + '.pdf')
+
+            await state.clear()
+        else:
+            cv = Converter(document.file_name)
+            cv.convert(document.file_name.split('.')[0] + '.docx')
+            cv.close()
+
+            converted_file = FSInputFile(document.file_name.split('.')[0] + '.docx')
+            await message.answer('Ваш файл:')
+            await bot.send_document(chat_id=message.chat.id, document=converted_file)
+
+            os.remove(document.file_name)
+            os.remove(document.file_name.split('.')[0] + '.docx')
+
+            await state.clear()
     else:
-        await message.answer("Пожалуйста, пришлите фото (файлом)")
+        await message.answer("Пожалуйста, пришлите фото или документ (файлом)")
 
 
 @dp.callback_query(States.format, F.data == 'png')
@@ -85,7 +123,7 @@ async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
     format_in = '.png'
-    new_img = f'{path.replace(format_from, "")}1{format_in}'
+    new_img = f'{path.replace(format_from, '')}1{format_in}'
 
     img = Image.open(path)
     img.save(new_img)
@@ -106,7 +144,7 @@ async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
     format_in = '.jpg'
-    new_img = f'{path.replace(format_from, "")}1{format_in}'
+    new_img = f'{path.replace(format_from, '')}1{format_in}'
 
     img = Image.open(path)
     if format_from == '.png':
@@ -129,7 +167,7 @@ async def to_webp(callback: CallbackQuery, state: FSMContext) -> None:
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
     format_in = '.webp'
-    new_img = f'{path.replace(format_from, "")}1{format_in}'
+    new_img = f'{path.replace(format_from, '')}1{format_in}'
 
     img = Image.open(path)
     if format_from == '.png':
@@ -170,26 +208,69 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
     youtube_link = data['link']
 
     youtube_object = YouTube(youtube_link)
-    youtube_object = youtube_object.streams.get_highest_resolution()
+    streams = youtube_object.streams
+    set_of_res = set()
 
-    video_title = re.sub('[/:*?"<>|+.#,]', '', youtube_object.title).replace('\\', '') + '.mp4'
+    for stream in streams:
+        if stream.resolution:
+            set_of_res.add(stream.resolution)
+
+    set_of_res = sorted(set_of_res)
+
+    resolutions_buttons = [
+        [InlineKeyboardButton(text=resolution, callback_data=resolution)] for resolution in set_of_res
+    ]
+
+    resolutions_keyboard = InlineKeyboardMarkup(inline_keyboard=resolutions_buttons, resize_keyboard=True)
+
+    await callback.message.answer('Выберите разрешение', reply_markup=resolutions_keyboard)
+
+    await state.set_state(States.resolution)
+    await state.update_data(link=youtube_link)
+
+
+@dp.callback_query(States.resolution)
+async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
+    resolution = callback.data
+    data = await state.get_data()
+    youtube_link = data['link']
+
+    # url = f'http://127.0.0.1:8081/bot{bot_token}/sendDocument'
+    url = f'http://127.0.0.1:8081/bot{bot_token}/sendVideo'
+
+    youtube_object = YouTube(youtube_link)
+    streams = youtube_object.streams
+    filtered_streams = streams.filter(res=resolution)
+    stream = filtered_streams.first()
+    mime_type = stream.mime_type
+
+    video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
 
     await callback.message.answer('Спасибо, пожалуйста подождите!')
 
     try:
-        youtube_object.download()
+        stream.download(filename=video_title)
     except:
         await callback.message.answer('С вашим видео что-то не так')
         await state.clear()
 
-    while not (os.path.exists(video_title)):
-        await callback.message.answer(video_title)
-        sleep(3)
+    clip = VideoFileClip(video_title)
+    width, height = clip.size
+    duration = clip.duration
 
+    payload = {'chat_id': callback.message.chat.id,
+               'supports_streaming': 'true',
+               'duration': duration,
+               'width': width,
+               'height': height}
 
-    downloaded_video = FSInputFile(video_title)
-    await callback.message.answer('Ваше видео:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
+    files = [
+        ('video', (video_title, open(video_title, 'rb'), mime_type))
+    ]
+
+    response = requests.post(url, data=payload, files=files)
+    await callback.message.answer('Ваше видео! Что-нибудь еще?')
+    print(response.text)
 
     os.remove(video_title)
 
@@ -199,13 +280,12 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
 @dp.callback_query(States.type_of_download, F.data == 'audio')
 async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
-    print('Аудио')
     youtube_link = data['link']
 
     youtube_object = YouTube(youtube_link)
     youtube_object = youtube_object.streams.get_audio_only()
 
-    video_title = re.sub('[/:*?"<>|+.#,]', '', youtube_object.title).replace('\\', '') + '.mp3'
+    video_title = re.sub('[/:*?"<>|+.;,#]', '', youtube_object.title).replace('\\', '') + '.mp3'
 
     await callback.message.answer('Спасибо, пожалуйста подождите!')
 
@@ -229,19 +309,18 @@ async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.message(F.voice)
 async def translation_without_message(message: Message) -> None:
-
     voice_msg_id = message.voice.file_id
 
     file = await bot.get_file(voice_msg_id)
     file_path = file.file_path
 
-    await bot.download_file(file_path, 'voice_message.ogg')
+    await bot.download_file(file_path, f'{message.from_user.id}_voice_message.ogg')
 
-    audio = AudioSegment.from_ogg('voice_message.ogg')
-    audio.export('voice_message.wav', format="wav")
+    audio = AudioSegment.from_ogg(f'{message.from_user.id}_voice_message.ogg')
+    audio.export(f'{message.from_user.id}_voice_message.wav', format="wav")
 
     recognizer = sr.Recognizer()
-    with sr.AudioFile('voice_message.wav') as source:
+    with sr.AudioFile(f'{message.from_user.id}_voice_message.wav') as source:
         audio_data = recognizer.record(source)
         try:
             text = recognizer.recognize_google(audio_data, language='ru-RU')
@@ -251,8 +330,8 @@ async def translation_without_message(message: Message) -> None:
         except sr.RequestError as e:
             await message.answer(f"Произошла ошибка в распознавании речи: {e}")
 
-    os.remove('voice_message.ogg')
-    os.remove('voice_message.wav')
+    os.remove(f'{message.from_user.id}_voice_message.ogg')
+    os.remove(f'{message.from_user.id}_voice_message.wav')
 
     await message.answer("Ваше расшифрованное сообщение выше")
 
@@ -270,13 +349,13 @@ async def translation(message: Message, state: FSMContext) -> None:
     file = await bot.get_file(voice_msg_id)
     file_path = file.file_path
 
-    await bot.download_file(file_path, 'voice_message.ogg')
+    await bot.download_file(file_path, f'{message.from_user.id}_voice_message.ogg')
 
-    audio = AudioSegment.from_ogg('voice_message.ogg')
-    audio.export('voice_message.wav', format="wav")
+    audio = AudioSegment.from_ogg(f'{message.from_user.id}_voice_message.ogg')
+    audio.export(f'{message.from_user.id}_voice_message.wav', format="wav")
 
     recognizer = sr.Recognizer()
-    with sr.AudioFile('voice_message.wav') as source:
+    with sr.AudioFile(f'{message.from_user.id}_voice_message.wav') as source:
         audio_data = recognizer.record(source)
         try:
             text = recognizer.recognize_google(audio_data, language='ru-RU')
@@ -286,10 +365,47 @@ async def translation(message: Message, state: FSMContext) -> None:
         except sr.RequestError as e:
             await message.answer(f"Произошла ошибка в распознавании речи: {e}")
 
-    os.remove('voice_message.ogg')
-    os.remove('voice_message.wav')
+    os.remove(f'{message.from_user.id}_voice_message.ogg')
+    os.remove(f'{message.from_user.id}_voice_message.wav')
 
     await state.clear()
+    await message.answer("Ваше расшифрованное сообщение выше")
+
+
+@dp.message(F.video_note)
+async def translation_video_note(message: Message) -> None:
+    note_msg_id = message.video_note.file_id
+    file = await bot.get_file(note_msg_id)
+
+    file_path = file.file_path
+
+    await bot.download_file(file_path, f'{message.from_user.id}_video_note_message.mp4')
+
+    mp4_file = f"{message.from_user.id}_video_note_message.mp4"
+    mp3_file = f"{message.from_user.id}_video_note_message.mp3"
+
+    video = moviepy.editor.VideoFileClip(mp4_file)
+    audio = video.audio
+    audio.write_audiofile(mp3_file)
+
+    audio = AudioSegment.from_mp3(f"{message.from_user.id}_video_note_message.mp3")
+    audio.export(f'{message.from_user.id}_video_note_message.wav', format="wav")
+
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(f'{message.from_user.id}_video_note_message.wav') as source:
+        audio_data = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio_data, language='ru-RU')
+            await message.answer(text)
+        except sr.UnknownValueError:
+            await message.answer("Извините, не удалось распознать речь.")
+        except sr.RequestError as e:
+            await message.answer(f"Произошла ошибка в распознавании речи: {e}")
+
+    os.remove(f'{message.from_user.id}_video_note_message.mp3')
+    os.remove(f'{message.from_user.id}_video_note_message.wav')
+    os.remove(f'{message.from_user.id}_video_note_message.mp4')
+
     await message.answer("Ваше расшифрованное сообщение выше")
 
 
