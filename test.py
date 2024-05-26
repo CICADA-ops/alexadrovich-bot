@@ -1,3 +1,4 @@
+'''
 import os
 import re
 import ssl
@@ -20,6 +21,7 @@ for stream in streams:
 l = sorted(l)
 for i in l:
     print(i)
+'''
 '''
 desired_resolution = '144p'
 filtered_streams = streams.filter(res=desired_resolution)
@@ -51,3 +53,18 @@ cv.close()
 480p
 720p
 '''
+import ssl
+from pytube import YouTube
+
+ssl._create_default_https_context = ssl._create_unverified_context
+
+resolution = '720p'
+youtube_link = 'https://youtu.be/tN13gRqAfss?si=_ns47uEOR_L7dWmF'
+
+youtube_object = YouTube(youtube_link)
+streams = youtube_object.streams
+filtered_streams = streams.filter(res=resolution)
+stream = filtered_streams.first()
+
+
+print(stream.on_progress)

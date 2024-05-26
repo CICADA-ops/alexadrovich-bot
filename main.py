@@ -4,6 +4,7 @@ import os
 import ssl
 import re
 import speech_recognition as sr
+import requests
 
 from pydub import AudioSegment
 
@@ -216,10 +217,9 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
 
     set_of_res = sorted(set_of_res)
 
-    resolutions_buttons = []
-
-    for resolution in set_of_res:
-        resolutions_buttons.append([InlineKeyboardButton(text=resolution, callback_data=resolution)])
+    resolutions_buttons = [
+        [InlineKeyboardButton(text=resolution, callback_data=resolution)] for resolution in set_of_res
+    ]
 
     resolutions_keyboard = InlineKeyboardMarkup(inline_keyboard=resolutions_buttons, resize_keyboard=True)
 
@@ -229,15 +229,20 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(link=youtube_link)
 
 
-@dp.callback_query(States.resolution, F.data == '144p')
-async def download_144p(callback: CallbackQuery, state: FSMContext) -> None:
+@dp.callback_query(States.resolution)
+async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
+    resolution = callback.data
     data = await state.get_data()
     youtube_link = data['link']
 
+    # url = f'http://127.0.0.1:8081/bot{bot_token}/sendDocument'
+    url = f'http://127.0.0.1:8081/bot{bot_token}/sendVideo'
+
     youtube_object = YouTube(youtube_link)
     streams = youtube_object.streams
-    filtered_streams = streams.filter(res='144p')
+    filtered_streams = streams.filter(res=resolution)
     stream = filtered_streams.first()
+    mime_type = stream.mime_type
 
     video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
 
@@ -249,140 +254,23 @@ async def download_144p(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.answer('С вашим видео что-то не так')
         await state.clear()
 
-    while not (os.path.exists(video_title)):
-        sleep(3)
+    clip = VideoFileClip(video_title)
+    width, height = clip.size
+    duration = clip.duration
 
-    downloaded_video = FSInputFile(video_title)
-    await callback.message.answer('Ваше видео:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
+    payload = {'chat_id': callback.message.chat.id,
+               'supports_streaming': 'true',
+               'duration': duration,
+               'width': width,
+               'height': height}
 
-    os.remove(video_title)
+    files = [
+        ('video', (video_title, open(video_title, 'rb'), mime_type))
+    ]
 
-    await state.clear()
-
-
-@dp.callback_query(States.resolution, F.data == '240p')
-async def download_240p(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    youtube_link = data['link']
-
-    youtube_object = YouTube(youtube_link)
-    streams = youtube_object.streams
-    filtered_streams = streams.filter(res='240p')
-    stream = filtered_streams.first()
-
-    video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
-
-    await callback.message.answer('Спасибо, пожалуйста подождите!')
-
-    try:
-        stream.download(filename=video_title)
-    except:
-        await callback.message.answer('С вашим видео что-то не так')
-        await state.clear()
-
-    while not (os.path.exists(video_title)):
-        sleep(3)
-
-    downloaded_video = FSInputFile(video_title)
-    await callback.message.answer('Ваше видео:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
-
-    os.remove(video_title)
-
-    await state.clear()
-
-
-@dp.callback_query(States.resolution, F.data == '360p')
-async def download_360p(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    youtube_link = data['link']
-
-    youtube_object = YouTube(youtube_link)
-    streams = youtube_object.streams
-    filtered_streams = streams.filter(res='360p')
-    stream = filtered_streams.first()
-
-    video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
-
-    await callback.message.answer('Спасибо, пожалуйста подождите!')
-
-    try:
-        stream.download(filename=video_title)
-    except:
-        await callback.message.answer('С вашим видео что-то не так')
-        await state.clear()
-
-    while not (os.path.exists(video_title)):
-        sleep(3)
-
-    downloaded_video = FSInputFile(video_title)
-    await callback.message.answer('Ваше видео:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
-
-    os.remove(video_title)
-
-    await state.clear()
-
-
-@dp.callback_query(States.resolution, F.data == '480p')
-async def download_480p(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    youtube_link = data['link']
-
-    youtube_object = YouTube(youtube_link)
-    streams = youtube_object.streams
-    filtered_streams = streams.filter(res='480p')
-    stream = filtered_streams.first()
-
-    video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
-
-    await callback.message.answer('Спасибо, пожалуйста подождите!')
-
-    try:
-        stream.download(filename=video_title)
-    except:
-        await callback.message.answer('С вашим видео что-то не так')
-        await state.clear()
-
-    while not (os.path.exists(video_title)):
-        sleep(3)
-
-    downloaded_video = FSInputFile(video_title)
-    await callback.message.answer('Ваше видео:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
-
-    os.remove(video_title)
-
-    await state.clear()
-
-
-@dp.callback_query(States.resolution, F.data == '720p')
-async def download_720p(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    youtube_link = data['link']
-
-    youtube_object = YouTube(youtube_link)
-    streams = youtube_object.streams
-    filtered_streams = streams.filter(res='720p')
-    stream = filtered_streams.first()
-
-    video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
-
-    await callback.message.answer('Спасибо, пожалуйста подождите!')
-
-    try:
-        stream.download(filename=video_title)
-    except:
-        await callback.message.answer('С вашим видео что-то не так')
-        await state.clear()
-
-    while not (os.path.exists(video_title)):
-        sleep(3)
-
-    downloaded_video = FSInputFile(video_title)
-    await callback.message.answer('Ваше видео:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_video)
+    response = requests.post(url, data=payload, files=files)
+    await callback.message.answer('Ваше видео! Что-нибудь еще?')
+    print(response.text)
 
     os.remove(video_title)
 
