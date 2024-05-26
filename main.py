@@ -85,7 +85,7 @@ async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
     format_in = '.png'
-    new_img = f'{path.replace(format_from, '')}1{format_in}'
+    new_img = f'{path.replace(format_from, "")}1{format_in}'
 
     img = Image.open(path)
     img.save(new_img)
@@ -106,7 +106,7 @@ async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
     format_in = '.jpg'
-    new_img = f'{path.replace(format_from, '')}1{format_in}'
+    new_img = f'{path.replace(format_from, "")}1{format_in}'
 
     img = Image.open(path)
     if format_from == '.png':
@@ -129,7 +129,7 @@ async def to_webp(callback: CallbackQuery, state: FSMContext) -> None:
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
     format_in = '.webp'
-    new_img = f'{path.replace(format_from, '')}1{format_in}'
+    new_img = f'{path.replace(format_from, "")}1{format_in}'
 
     img = Image.open(path)
     if format_from == '.png':
@@ -172,7 +172,7 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
     youtube_object = YouTube(youtube_link)
     youtube_object = youtube_object.streams.get_highest_resolution()
 
-    video_title = re.sub('[/:*?"<>|+.#]', '', youtube_object.title).replace('\\', '') + '.mp4'
+    video_title = re.sub('[/:*?"<>|+.#,]', '', youtube_object.title).replace('\\', '') + '.mp4'
 
     await callback.message.answer('Спасибо, пожалуйста подождите!')
 
@@ -183,7 +183,9 @@ async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
 
     while not (os.path.exists(video_title)):
+        await callback.message.answer(video_title)
         sleep(3)
+
 
     downloaded_video = FSInputFile(video_title)
     await callback.message.answer('Ваше видео:')
@@ -203,7 +205,7 @@ async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
     youtube_object = YouTube(youtube_link)
     youtube_object = youtube_object.streams.get_audio_only()
 
-    video_title = re.sub('[/:*?"<>|+.#]', '', youtube_object.title).replace('\\', '') + '.mp3'
+    video_title = re.sub('[/:*?"<>|+.#,]', '', youtube_object.title).replace('\\', '') + '.mp3'
 
     await callback.message.answer('Спасибо, пожалуйста подождите!')
 

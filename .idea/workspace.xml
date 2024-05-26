@@ -5,8 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="095fe4ae-912c-4b4a-9f07-2b5bcfdf6284" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/alexadrovich-bot.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/alexadrovich-bot.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/adds/YouTube_downloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/adds/YouTube_downloader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -42,10 +43,11 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Python.main.executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "YouTube-branch",
     "last_opened_file_path": "/Users/cicada/Documents/GitHub/alexadrovich-bot",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
