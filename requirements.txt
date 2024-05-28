@@ -10,3 +10,4 @@ appscript==1.2.5
 docx2pdf==0.1.8
 pdf2docx==0.5.8
 requests==2.31.0
+tqdm==4.66.2

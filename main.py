@@ -27,8 +27,10 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
                            InlineKeyboardButton, InlineKeyboardMarkup)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import adds.keyboards as kb
 
@@ -37,16 +39,19 @@ from config import bot_token
 ssl._create_default_https_context = ssl._create_unverified_context
 
 bot = Bot(token=bot_token)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
 
 class States(StatesGroup):
     photo = State()
     format = State()
     link = State()
-    type_of_download = State()
     resolution = State()
     voice_msg = State()
+
+
+def bytes_to_megabytes(bytes_size):
+    return bytes_size / (1024 ** 2)
 
 
 @dp.message(Command("start"))
@@ -195,114 +200,127 @@ async def getting_link(message: Message, state: FSMContext) -> None:
     youtube_link = message.text
 
     if ('youtu.be' in youtube_link) or ('youtube.com' in youtube_link) or ('m.youtube.com' in youtube_link):
-        await message.answer('Теперь выберите что хотите скачать', reply_markup=kb.downloading_type_keyboard)
+
+        youtube_object = YouTube(youtube_link)
+        streams = youtube_object.streams
+        file_name = youtube_object.title
+        thumbnail_url = youtube_object.thumbnail_url
+
+        set_of_res = sorted({stream.resolution for stream in streams if stream.resolution}, key=lambda x: int(x[:-1]))
+
+        builder = InlineKeyboardBuilder()
+
+        for resolution in set_of_res:
+            builder.button(text=resolution, callback_data=resolution)
+
+        builder.button(text='Аудио', callback_data='audio')
+        builder.adjust(4)
+
+        response = requests.get(thumbnail_url)
+        thumbnail_path = 'thumbnail.jpg'
+        with open(thumbnail_path, 'wb') as file:
+            file.write(response.content)
+
+        await bot.delete_message(message.chat.id, message.message_id)
+        await bot.send_photo(message.chat.id, FSInputFile(thumbnail_path), caption=f'📹{file_name}', reply_markup=builder.as_markup())
+
+        os.remove(thumbnail_path)
+
         await state.update_data(link=youtube_link)
-        await state.set_state(States.type_of_download)
+        await state.set_state(States.resolution)
     else:
         await message.answer('Кажется, это не ссылка на ютуб')
 
 
-@dp.callback_query(States.type_of_download, F.data == 'video')
-async def video_download(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    youtube_link = data['link']
+async def download_video(youtube_link: str, message: Message, resolution: str):
+    loop = asyncio.get_event_loop()
 
-    youtube_object = YouTube(youtube_link)
+    async def edit_message(progress_message: str):
+        await message.edit_text(progress_message)
+
+    def progress_func(stream, chunk, bytes_remaining):
+        current = stream.filesize - bytes_remaining
+        done = int(50 * current / stream.filesize)
+        progress_message = (
+            f"[{'=' * done}{' ' * (50 - done)}] "
+            f"{bytes_to_megabytes(current):.2f} MB / {bytes_to_megabytes(stream.filesize):.2f} MB"
+        )
+        asyncio.run_coroutine_threadsafe(edit_message(progress_message), loop)
+
+    youtube_object = YouTube(youtube_link, on_progress_callback=progress_func)
     streams = youtube_object.streams
-    set_of_res = set()
+    filtered_streams = streams.filter(res=resolution)
+    stream = filtered_streams.first()
 
-    for stream in streams:
-        if stream.resolution:
-            set_of_res.add(stream.resolution)
+    video_title = stream.default_filename
 
-    set_of_res = sorted(set_of_res)
-
-    resolutions_buttons = [
-        [InlineKeyboardButton(text=resolution, callback_data=resolution)] for resolution in set_of_res
-    ]
-
-    resolutions_keyboard = InlineKeyboardMarkup(inline_keyboard=resolutions_buttons, resize_keyboard=True)
-
-    await callback.message.answer('Выберите разрешение', reply_markup=resolutions_keyboard)
-
-    await state.set_state(States.resolution)
-    await state.update_data(link=youtube_link)
+    await loop.run_in_executor(None, stream.download)
 
 
 @dp.callback_query(States.resolution)
 async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
-    resolution = callback.data
-    data = await state.get_data()
-    youtube_link = data['link']
+    if callback.data == 'audio':
+        data = await state.get_data()
+        youtube_link = data['link']
 
-    # url = f'http://127.0.0.1:8081/bot{bot_token}/sendDocument'
-    url = f'http://127.0.0.1:8081/bot{bot_token}/sendVideo'
+        youtube_object = YouTube(youtube_link)
+        youtube_object = youtube_object.streams.get_audio_only()
 
-    youtube_object = YouTube(youtube_link)
-    streams = youtube_object.streams
-    filtered_streams = streams.filter(res=resolution)
-    stream = filtered_streams.first()
-    mime_type = stream.mime_type
+        video_title = youtube_object.default_filename[:-1] + '3'
 
-    video_title = re.sub('[/:*?"<>|+.;,#]', '', stream.title).replace('\\', '') + '.mp4'
+        await callback.message.answer('Спасибо, пожалуйста подождите!')
 
-    await callback.message.answer('Спасибо, пожалуйста подождите!')
+        try:
+            youtube_object.download(filename=video_title)
+        except:
+            await callback.message.answer('С вашим видео что-то не так')
+            await state.clear()
 
-    try:
-        stream.download(filename=video_title)
-    except:
-        await callback.message.answer('С вашим видео что-то не так')
-        await state.clear()
+        downloaded_audio = FSInputFile(video_title)
+        await callback.message.answer('Ваше аудио:')
+        await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_audio)
 
-    clip = VideoFileClip(video_title)
-    width, height = clip.size
-    duration = clip.duration
+        os.remove(video_title)
 
-    payload = {'chat_id': callback.message.chat.id,
-               'supports_streaming': 'true',
-               'duration': duration,
-               'width': width,
-               'height': height}
+    else:
+        resolution = callback.data
+        data = await state.get_data()
+        youtube_link = data['link']
 
-    files = [
-        ('video', (video_title, open(video_title, 'rb'), mime_type))
-    ]
+        url = f'http://127.0.0.1:8081/bot{bot_token}/sendVideo'
 
-    response = requests.post(url, data=payload, files=files)
-    await callback.message.answer('Ваше видео! Что-нибудь еще?')
-    print(response.text)
+        youtube_object = YouTube(youtube_link)
+        streams = youtube_object.streams
+        filtered_streams = streams.filter(res=resolution)
+        stream = filtered_streams.first()
+        mime_type = stream.mime_type
 
-    os.remove(video_title)
+        video_title = stream.default_filename
 
-    await state.clear()
+        progress_message = await callback.message.reply('Спасибо, пожалуйста подождите!')
 
+        await download_video(youtube_link, progress_message, resolution)
+        await progress_message.edit_text("Загрузка завершена! Дождитесь отправки")
 
-@dp.callback_query(States.type_of_download, F.data == 'audio')
-async def audio_download(callback: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    youtube_link = data['link']
+        clip = VideoFileClip(video_title)
+        width, height = clip.size
+        duration = clip.duration
 
-    youtube_object = YouTube(youtube_link)
-    youtube_object = youtube_object.streams.get_audio_only()
+        payload = {'chat_id': callback.message.chat.id,
+                   'supports_streaming': 'true',
+                   'width': width,
+                   'height': height,
+                   'duration': duration}
 
-    video_title = re.sub('[/:*?"<>|+.;,#]', '', youtube_object.title).replace('\\', '') + '.mp3'
+        files = [
+            ('video', (video_title, open(video_title, 'rb'), mime_type))
+        ]
 
-    await callback.message.answer('Спасибо, пожалуйста подождите!')
+        response = requests.post(url, data=payload, files=files)
+        print(response)
+        await callback.message.answer('Ваше видео! Что-нибудь еще?')
 
-    try:
-        youtube_object.download(filename=video_title)
-    except:
-        await callback.message.answer('С вашим видео что-то не так')
-        await state.clear()
-
-    while not (os.path.exists(video_title)):
-        sleep(3)
-
-    downloaded_audio = FSInputFile(video_title)
-    await callback.message.answer('Ваше аудио:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_audio)
-
-    os.remove(video_title)
+        os.remove(video_title)
 
     await state.clear()
 
