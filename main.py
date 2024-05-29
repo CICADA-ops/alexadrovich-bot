@@ -53,7 +53,10 @@ import adds.keyboards as kb
 ssl._create_default_https_context = ssl._create_unverified_context
 
 load_dotenv()
-bot = Bot(os.getenv('bot_token'))
+
+bot_token = os.getenv('bot_token')
+
+bot = Bot(bot_token)
 dp = Dispatcher(storage=MemoryStorage())
 
 
@@ -280,10 +283,12 @@ async def download_video(youtube_link: str, message: Message, resolution: str):
         await message.edit_text(progress_message)
 
     def progress_func(stream, chunk, bytes_remaining):
+        total_length = 10
         current = stream.filesize - bytes_remaining
-        done = int(50 * current / stream.filesize)
+        done = int(total_length * current / stream.filesize)
+        percent = (current / stream.filesize) * 100
         progress_message = (
-            f"[{'=' * done}{' ' * (50 - done)}] "
+            f"[{'█' * done}{'▢' * (total_length - done)}] {percent:.2f}%\n "
             f"{bytes_to_megabytes(current):.2f} MB / {bytes_to_megabytes(stream.filesize):.2f} MB"
         )
         asyncio.run_coroutine_threadsafe(edit_message(progress_message), loop)
