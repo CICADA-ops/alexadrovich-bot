@@ -17,6 +17,7 @@ import ssl
 import re
 import speech_recognition as sr
 import requests
+from dotenv import load_dotenv
 
 from pydub import AudioSegment
 
@@ -49,11 +50,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import adds.keyboards as kb
 
-from config import bot_token
-
 ssl._create_default_https_context = ssl._create_unverified_context
 
-bot = Bot(token=bot_token)
+load_dotenv()
+bot = Bot(os.getenv('bot_token'))
 dp = Dispatcher(storage=MemoryStorage())
 
 
