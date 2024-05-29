@@ -1,3 +1,15 @@
+"""
+
+    ░█████╗░██╗░░░░░███████╗██╗░░██╗░░░░░██████╗░░█████╗░████████╗
+    ██╔══██╗██║░░░░░██╔════╝╚██╗██╔╝░░░░░██╔══██╗██╔══██╗╚══██╔══╝
+    ███████║██║░░░░░█████╗░░░╚███╔╝ ░░░░░██████╦╝██║░░██║░░░██║░░░
+    ██╔══██║██║░░░░░██╔══╝░░░██╔██╗ ░░░░░██╔══██╗██║░░██║░░░██║░░░
+    ██║░░██║███████╗███████╗██╔╝╚██╗░░░░░██████╦╝╚█████╔╝░░░██║░░░
+    ╚═╝░░╚═╝╚══════╝╚══════╝╚═╝░░╚═╝░░░░░╚═════╝░░╚════╝░░░░╚═╝░░░
+
+    by CICADA, Cheroit, AK
+"""
+
 import asyncio
 import logging
 import os
@@ -21,6 +33,9 @@ import moviepy
 from moviepy.editor import *
 
 from PIL import Image
+
+import mimetypes
+
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
@@ -70,7 +85,7 @@ async def converter_button(message: Message, state: FSMContext) -> None:
 async def handle_document(message: Message, state: FSMContext) -> None:
     document = message.document
 
-    photo_formats = ['jpg', 'png', 'webp']
+    photo_formats = ['jpg', 'jpeg', 'png', 'webp']
     doc_formats = ['docx', 'pdf']
 
     file_format = (document.file_name.split('.')[-1]).lower()
@@ -83,11 +98,12 @@ async def handle_document(message: Message, state: FSMContext) -> None:
         format_buttons = [
             [InlineKeyboardButton(text=photo_formats[0], callback_data=photo_formats[0])],
             [InlineKeyboardButton(text=photo_formats[1], callback_data=photo_formats[1])],
+            [InlineKeyboardButton(text=photo_formats[2], callback_data=photo_formats[2])],
         ]
 
         format_keyboard = InlineKeyboardMarkup(inline_keyboard=format_buttons)
 
-        await message.answer("Выберите формат для нового файла:", reply_markup=format_keyboard)
+        await message.answer("Выберите формат для нового файла", reply_markup=format_keyboard)
         await state.update_data(photo=document.file_name)
         await state.set_state(States.format)
 
@@ -98,8 +114,7 @@ async def handle_document(message: Message, state: FSMContext) -> None:
             convert(document.file_name, document.file_name.split('.')[0] + '.pdf')
 
             converted_file = FSInputFile(document.file_name.split('.')[0] + '.pdf')
-            await message.answer('Ваш файл:')
-            await bot.send_document(chat_id=message.chat.id, document=converted_file)
+            await bot.send_document(message.chat.id, converted_file, caption=f'💾 Ваш файл')
 
             os.remove(document.file_name)
             os.remove(document.file_name.split('.')[0] + '.pdf')
@@ -111,8 +126,7 @@ async def handle_document(message: Message, state: FSMContext) -> None:
             cv.close()
 
             converted_file = FSInputFile(document.file_name.split('.')[0] + '.docx')
-            await message.answer('Ваш файл:')
-            await bot.send_document(chat_id=message.chat.id, document=converted_file)
+            await bot.send_document(message.chat.id, converted_file, caption=f'💾 Ваш файл')
 
             os.remove(document.file_name)
             os.remove(document.file_name.split('.')[0] + '.docx')
@@ -124,6 +138,8 @@ async def handle_document(message: Message, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'png')
 async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+
     data = await state.get_data()
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
@@ -134,8 +150,7 @@ async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
     img.save(new_img)
 
     converted_img = FSInputFile(new_img)
-    await callback.message.answer('Ваше фото:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=converted_img)
+    await bot.send_document(callback.message.chat.id, converted_img, caption=f'📷 Ваше фото')
 
     os.remove(path)
     os.remove(new_img)
@@ -145,6 +160,8 @@ async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'jpg')
 async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+
     data = await state.get_data()
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
@@ -157,8 +174,31 @@ async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
     img.save(new_img)
 
     converted_img = FSInputFile(new_img)
-    await callback.message.answer('Ваше фото:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=converted_img)
+    await bot.send_document(callback.message.chat.id, converted_img, caption=f'📷 Ваше фото')
+
+    os.remove(path)
+    os.remove(new_img)
+
+    await state.clear()
+
+
+@dp.callback_query(States.format, F.data == 'jpeg')
+async def to_jpeg(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    data = await state.get_data()
+    path = data['photo']
+    format_from = '.' + path.split('.')[-1]
+    format_in = '.jpeg'
+    new_img = f'{path.replace(format_from, '')}1{format_in}'
+
+    img = Image.open(path)
+    if format_from == '.png':
+        img = img.convert('RGB')
+    img.save(new_img)
+
+    converted_img = FSInputFile(new_img)
+    await bot.send_document(callback.message.chat.id, converted_img, caption=f'📷 Ваше фото')
 
     os.remove(path)
     os.remove(new_img)
@@ -168,6 +208,8 @@ async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'webp')
 async def to_webp(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+
     data = await state.get_data()
     path = data['photo']
     format_from = '.' + path.split('.')[-1]
@@ -180,8 +222,7 @@ async def to_webp(callback: CallbackQuery, state: FSMContext) -> None:
     img.save(new_img)
 
     converted_img = FSInputFile(new_img)
-    await callback.message.answer('Ваше фото:')
-    await bot.send_document(chat_id=callback.message.chat.id, document=converted_img)
+    await bot.send_document(callback.message.chat.id, converted_img, caption=f'📷 Ваше фото')
 
     os.remove(path)
     os.remove(new_img)
@@ -259,6 +300,8 @@ async def download_video(youtube_link: str, message: Message, resolution: str):
 
 @dp.callback_query(States.resolution)
 async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_reply_markup(reply_markup=None)
+
     if callback.data == 'audio':
         data = await state.get_data()
         youtube_link = data['link']
@@ -317,7 +360,7 @@ async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
         ]
 
         response = requests.post(url, data=payload, files=files)
-        print(response)
+        print(response.text)
         await callback.message.answer('Ваше видео! Что-нибудь еще?')
 
         os.remove(video_title)
