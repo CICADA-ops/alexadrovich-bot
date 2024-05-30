@@ -8,7 +8,6 @@
     ╚═╝░░╚═╝╚══════╝╚══════╝╚═╝░░╚═╝░░░░░╚═════╝░░╚════╝░░░░╚═╝░░░
 
     by CICADA, Cheroit, AK
-    
 Муж на час в обличии Telegram бота'а который умеет:
 - Скачивать видео и аудио по YouTube-ссылке
 - Ковертировать фото и документы
@@ -31,6 +30,4 @@
 Библиотеки для `main.py` указаны в `requirements.txt`.
 
 ## Создатели
-	[CICADA](https://t.me/cicadaaaa)
-	[Cheroit](https://t.me/pyrmaf064)
-	[AK](https://t.me/scriptkor)
+[CICADA](https://t.me/cicadaaaa), [Cheroit](https://t.me/pyrmaf064), [AK](https://t.me/scriptkor)
