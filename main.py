@@ -141,7 +141,7 @@ async def handle_document(message: Message, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'png')
 async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     data = await state.get_data()
     path = data['photo']
@@ -163,7 +163,7 @@ async def to_png(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'jpg')
 async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     data = await state.get_data()
     path = data['photo']
@@ -187,7 +187,7 @@ async def to_jpg(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'jpeg')
 async def to_jpeg(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     data = await state.get_data()
     path = data['photo']
@@ -211,7 +211,7 @@ async def to_jpeg(callback: CallbackQuery, state: FSMContext) -> None:
 
 @dp.callback_query(States.format, F.data == 'webp')
 async def to_webp(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
     data = await state.get_data()
     path = data['photo']
@@ -314,22 +314,28 @@ async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
         youtube_object = YouTube(youtube_link)
         youtube_object = youtube_object.streams.get_audio_only()
 
-        video_title = youtube_object.default_filename[:-1] + '3'
-
-        await callback.message.answer('Спасибо, пожалуйста подождите!')
-
         try:
-            youtube_object.download(filename=video_title)
+            if youtube_object.filesize_gb < 2:
+                video_title = youtube_object.default_filename[:-1] + '3'
+
+                await callback.message.answer('Спасибо, пожалуйста подождите!')
+
+                try:
+                    youtube_object.download(filename=video_title)
+                except:
+                    await callback.message.answer('С вашим видео что-то не так')
+                    await state.clear()
+
+                downloaded_audio = FSInputFile(video_title)
+                await callback.message.answer('Ваше аудио:')
+                await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_audio)
+
+                os.remove(video_title)
+            else:
+                await callback.message.answer('Файл слишком большой! (>2ГБ.)')
         except:
             await callback.message.answer('С вашим видео что-то не так')
             await state.clear()
-
-        downloaded_audio = FSInputFile(video_title)
-        await callback.message.answer('Ваше аудио:')
-        await bot.send_document(chat_id=callback.message.chat.id, document=downloaded_audio)
-
-        os.remove(video_title)
-
     else:
         resolution = callback.data
         data = await state.get_data()
@@ -343,33 +349,45 @@ async def download_any(callback: CallbackQuery, state: FSMContext) -> None:
         stream = filtered_streams.first()
         mime_type = stream.mime_type
 
-        video_title = stream.default_filename
+        try:
+            if stream.filesize_gb < 2:
+                video_title = stream.default_filename
 
-        progress_message = await callback.message.reply('Спасибо, пожалуйста подождите!')
+                progress_message = await callback.message.reply('Спасибо, пожалуйста подождите!')
 
-        await download_video(youtube_link, progress_message, resolution)
-        await progress_message.edit_text("Загрузка завершена! Дождитесь отправки")
+                try:
+                    await download_video(youtube_link, progress_message, resolution)
+                except:
+                    await callback.message.answer('С вашим видео что-то не так')
+                    await state.clear()
 
-        clip = VideoFileClip(video_title)
-        width, height = clip.size
-        duration = clip.duration
+                await progress_message.edit_text("Загрузка завершена! Дождитесь отправки")
 
-        payload = {'chat_id': callback.message.chat.id,
-                   'supports_streaming': 'true',
-                   'width': width,
-                   'height': height,
-                   'duration': duration}
+                clip = VideoFileClip(video_title)
+                width, height = clip.size
+                duration = clip.duration
 
-        files = [
-            ('video', (video_title, open(video_title, 'rb'), mime_type))
-        ]
+                payload = {'chat_id': callback.message.chat.id,
+                           'supports_streaming': 'true',
+                           'width': width,
+                           'height': height,
+                           'duration': duration}
 
-        response = requests.post(url, data=payload, files=files)
-        print(response.text)
-        await callback.message.answer('Ваше видео! Что-нибудь еще?')
+                files = [
+                    ('video', (video_title, open(video_title, 'rb'), mime_type))
+                ]
 
-        os.remove(video_title)
+                response = requests.post(url, data=payload, files=files)
+                print(response.text)
+                await callback.message.answer('Ваше видео! Что-нибудь еще?')
 
+                os.remove(video_title)
+            else:
+                await callback.message.answer('Файл слишком большой! (>2ГБ.)')
+
+        except:
+            await callback.message.answer('С вашим видео что-то не так')
+            await state.clear()
     await state.clear()
 
 

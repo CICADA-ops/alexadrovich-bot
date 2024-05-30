@@ -5,22 +5,11 @@ import os
 import mimetypes
 
 ssl._create_default_https_context = ssl._create_unverified_context
-'''
-youtube_link = 'https://youtu.be/lTo6aG7xD6I?si=edcomtuTJpZgAPQB'
+
+youtube_link = 'https://youtu.be/HRbW75fYLvo?si=z_jI4H7Re_hCQXvu'
 youtube_object = YouTube(youtube_link)
-audio_part = youtube_object.streams.get_audio_only()
 streams = youtube_object.streams
-filtered_streams = streams.filter(res='720p')
-stream = filtered_streams.first()
-mime_type = stream.mime_type
-
-video_title = stream.default_filename
-audio_title = audio_part.default_filename
-
-print(video_title)
-print(audio_title)
-'''
-video_title = 'НЕИГРЫ  Варя Щербакова VS Оля Парфенюк.webm'
-cmd = f'ffmpeg -i "{video_title}" -c:v libx264 -preset slow -crf 22 -c:a aac -b:a 128k "1_{video_title.split('.')[0]}.mp4"'
-os.system(cmd)
-
+stream = streams.filter(res='720p').first()
+print(stream.filesize_mb / 1024)
+stream = streams.filter(res='480p').first()
+print(stream.filesize_mb / 1024)
